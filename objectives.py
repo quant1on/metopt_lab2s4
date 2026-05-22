@@ -118,6 +118,43 @@ def levi_n13_grad_2d(x: np.ndarray) -> np.ndarray:
 
     return np.array([dfdx1, dfdx2], dtype=float)
 
+def stepped_himmelblau_2d(x: np.ndarray, d: float = 0.18) -> float:
+    x_vec = ensure_float_vector(x)
+    if x_vec.size != 2:
+        raise ValidationError("Stepped Himmelblau 2D expects dim=2.")
+
+    x1, x2 = x_vec
+    
+    c1 = np.round(np.sin(10.0 * x2)) + 2.0
+    c2 = np.round(np.sin(7.0 * x1)) + 2.0
+    
+    term1 = ((x1 * c1) ** 2 + x2 - 10.0) ** 2
+    term2 = (x1 + (x2 * c2) ** 2 - 7.0) ** 2
+    
+    return float(d * (term1 + term2))
+
+
+def stepped_himmelblau_grad_2d(x: np.ndarray, d: float = 0.18) -> np.ndarray:
+    """
+    Локальный градиент для модифицированной функции Химмельблау.
+    Внимание: производная от round() игнорируется (принимается за 0 локально).
+    """
+    x_vec = ensure_float_vector(x)
+    if x_vec.size != 2:
+        raise ValidationError("Stepped Himmelblau 2D gradient expects dim=2.")
+
+    x1, x2 = x_vec
+    
+    c1 = np.round(np.sin(10.0 * x2)) + 2.0
+    c2 = np.round(np.sin(7.0 * x1)) + 2.0
+    
+    part1 = (x1 * c1) ** 2 + x2 - 10.0
+    part2 = x1 + (x2 * c2) ** 2 - 7.0
+    
+    dfdx1 = d * (2.0 * part1 * 2.0 * x1 * (c1 ** 2) + 2.0 * part2)
+    dfdx2 = d * (2.0 * part1 + 2.0 * part2 * 2.0 * x2 * (c2 ** 2))
+
+    return np.array([dfdx1, dfdx2], dtype=float)
 
 def get_objective(name: str, dim: int = 2) -> ObjectiveSpec:
     key = name.strip().lower()
