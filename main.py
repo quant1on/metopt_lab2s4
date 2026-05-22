@@ -7,7 +7,7 @@ import numpy as np
 from objectives import ObjectiveSpec, get_objective
 from optimizers import ALL_OPTIMIZERS, GRADIENT_OPTIMIZERS
 from runner import run_optimization
-from utils import make_rng, make_uniform_point, make_uniform_population
+from utils import make_point_at_distance, make_rng, make_uniform_point, make_uniform_population
 
 
 def _build_kwargs(name: str, spec: ObjectiveSpec, seed: int) -> dict:
@@ -80,6 +80,11 @@ def _build_kwargs(name: str, spec: ObjectiveSpec, seed: int) -> dict:
 
 
 def run_demo() -> None:
+    ZONES = {
+        "close": 0.5,
+        "medium": 2.5,
+        "far": 4.5,
+    }
     log_dir = Path(__file__).resolve().parent
     tasks = [
         ("rosenbrock", 2),
@@ -93,32 +98,48 @@ def run_demo() -> None:
         spec = get_objective(function_name, dim=dim)
         print(f"\n=== {spec.name} (dim={spec.dim}) ===")
 
-        for idx, (algorithm_name, algorithm) in enumerate(ALL_OPTIMIZERS.items()):
-            if algorithm_name in GRADIENT_OPTIMIZERS and function_name == "levi_n13" and dim != 2:
-                continue
+        for zone_name, dist in ZONES.items():
+            for idx, (algorithm_name, algorithm) in enumerate(ALL_OPTIMIZERS.items()):
+                if algorithm_name in GRADIENT_OPTIMIZERS and function_name == "levi_n13" and dim != 2:
+                    continue
 
-            kwargs = _build_kwargs(algorithm_name, spec, seed=100 + idx)
-            x_best, f_best, meta = run_optimization(
-                algorithm=algorithm,
-                algo_kwargs=kwargs,
-                max_restarts=1,
-                log_dir=log_dir,
-                algorithm_name=algorithm_name,
-                function_name=spec.name,
-                dim=spec.dim,
-            )
+                kwargs = _build_kwargs(algorithm_name, spec, seed=100 + idx)
+                rng = make_rng(500 + idx)
+                x0 = make_point_at_distance(rng, spec.optimum_point, dist, spec.bounds)
 
-            results.append(
-                {
-                    "algorithm": algorithm_name,
-                    "function": spec.name,
-                    "dim": spec.dim,
-                    "f_best": f_best,
-                    "iters": int(meta.get("iterations", 0)),
-                    "reason": str(meta.get("reason", "n/a")),
-                }
-            )
-            print(f"{algorithm_name:12s} f_best={f_best:12.6f} iters={meta.get('iterations', 0):4}")
+                if algorithm_name == "ga":
+                    population_size = int(kwargs.get("population_size", 32))
+                    kwargs["x0_population"] = [
+                        x0 + rng.normal(0.0, 0.3, size=spec.dim) for _ in range(population_size)
+                    ]
+                else:
+                    kwargs["x0"] = x0
+
+                x_best, f_best, meta = run_optimization(
+                    algorithm=algorithm,
+                    algo_kwargs=kwargs,
+                    max_restarts=1,
+                    log_dir=log_dir,
+                    algorithm_name=algorithm_name,
+                    function_name=spec.name,
+                    dim=spec.dim,
+                )
+
+                results.append(
+                    {
+                        "algorithm": algorithm_name,
+                        "function": spec.name,
+                        "dim": spec.dim,
+                        "f_best": f_best,
+                        "iters": int(meta.get("iterations", 0)),
+                        "reason": str(meta.get("reason", "n/a")),
+                        "zone": zone_name,
+                        "init_dist": dist,
+                    }
+                )
+                print(
+                    f"{algorithm_name:12s} f_best={f_best:12.6f} iters={meta.get('iterations', 0):4}"
+                )
 
     print("\n=== Summary ===")
     for row in results:

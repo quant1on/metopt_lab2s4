@@ -90,3 +90,16 @@ def make_uniform_population(
     if size <= 0:
         raise ValidationError("Population size must be positive.")
     return [make_uniform_point(rng, dim, bounds) for _ in range(size)]
+
+
+def make_point_at_distance(
+    rng: np.random.Generator,
+    center: np.ndarray,
+    target_distance: float,
+    bounds: Bounds | None,
+) -> np.ndarray:
+    direction = rng.standard_normal(center.size)
+    direction /= np.linalg.norm(direction)
+    x0 = center + direction * target_distance
+    lower, upper = normalize_bounds(bounds, center.size)
+    return np.clip(x0, lower, upper)
